@@ -84,3 +84,15 @@ def compute_B2(Y, D, X, A):
         "C_D2": C_D2,
         "S2":   S2,
     }
+
+
+def compute_RV(tau_hat, S2):
+    """
+    Robustness Value: minimum equal confounding (C_Y² = C_D² = RV) such that B = |tau_hat|.
+
+    Derived from B² = C_Y² · C_D² · S² = RV² · S² = tau_hat²  →  RV = |tau_hat| / √S².
+
+    Interpretation: if the hidden confounder has C_Y² ≥ RV and C_D² ≥ RV simultaneously,
+    it can fully account for the observed estimate.  A small RV means the conclusion is fragile.
+    """
+    return abs(tau_hat) / np.sqrt(max(S2, 1e-15))
