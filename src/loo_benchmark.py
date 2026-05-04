@@ -12,7 +12,6 @@ were exactly as powerful as X_j in explaining both D and Y.
 
 import numpy as np
 from ovb_formula import compute_S2, compute_C_Y2, compute_C_D2
-from ovb_simulation import generate_data
 
 
 def loo_benchmark(Y, D, X_matrix):
@@ -51,26 +50,3 @@ def loo_benchmark(Y, D, X_matrix):
         })
 
     return results, S2_full
-
-
-def main():
-    Y, D, X, _ = generate_data(n=2000, num_X=5)
-
-    results, S2_full = loo_benchmark(Y, D, X)
-
-    print("=" * 68)
-    print("LOO Benchmark — each X_j treated as the omitted confounder A")
-    print("=" * 68)
-    print(f"  S² (full short regression): {S2_full:.4f}\n")
-    print(f"  {'Covariate':<12} {'C_Y²':>8} {'C_D²':>8} {'B':>8}")
-    print("  " + "-" * 40)
-    for r in results:
-        print(f"  {r['covariate']:<12} {r['C_Y2']:>8.4f} {r['C_D2']:>8.4f} {r['B']:>8.4f}")
-
-    best = max(results, key=lambda r: r["B"])
-    print(f"\n  Strongest benchmark: {best['covariate']}  (B = {best['B']:.4f})")
-    print("\n  If A is as strong as the strongest X_j, OVB ≤ that B.")
-
-
-if __name__ == "__main__":
-    main()
