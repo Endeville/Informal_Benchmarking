@@ -45,14 +45,18 @@ def generate_data(n=2000, tau=1.0,
     X : (n, num_X) observed covariates
     A : (n, num_A) hidden confounders
     """
+    def _to_arr(val, size):
+        a = np.asarray(val, dtype=float)
+        return np.full(size, a) if a.ndim == 0 else a
+
     rng = np.random.default_rng(seed)
     X = rng.standard_normal((n, num_X))
     A = rng.standard_normal((n, num_A))
 
-    beta_dx_arr = np.full(num_X, beta_dx)
-    beta_yx_arr = np.full(num_X, beta_yx)
-    beta_da_arr = np.full(num_A, beta_da)
-    beta_ya_arr = np.full(num_A, beta_ya)
+    beta_dx_arr = _to_arr(beta_dx, num_X)
+    beta_yx_arr = _to_arr(beta_yx, num_X)
+    beta_da_arr = _to_arr(beta_da, num_A)
+    beta_ya_arr = _to_arr(beta_ya, num_A)
 
     D = X @ beta_dx_arr + A @ beta_da_arr + rng.standard_normal(n)
     Y = tau * D + X @ beta_yx_arr + A @ beta_ya_arr + rng.standard_normal(n)
