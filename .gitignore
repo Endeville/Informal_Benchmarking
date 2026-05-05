@@ -7,3 +7,6 @@ __pycache__/
 dist/
 build/
 .DS_Store
+notebooks/figures/
+notebooks/experiment_01_results.npy
+notebooks/experiment_02_results.npy
