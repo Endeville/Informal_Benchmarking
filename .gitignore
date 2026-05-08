@@ -9,3 +9,4 @@ build/
 .DS_Store
 notebooks/figures/
 notebooks/results/*.npy
+CLAUDE.md

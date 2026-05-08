@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Union
 import numpy as np
 
+
 class TreatmentType(Enum):
     CONTINUOUS = "continuous"
     BINARY = "binary"           # D = 1(D* > 0), probit threshold
@@ -28,7 +29,7 @@ class OutcomeType(Enum):
 
 class ConfounderCorrelation(Enum):
     INDEPENDENT = "independent"     # A ~ N(0, I)
-    CORRELATED = "correlated"       # A = 0.7·X[:, :num_A] + 0.3·noise
+    CORRELATED = "correlated"       # A = ρ·X[:, :num_A] + √(1−ρ²)·noise  (Var(A) = 1)
 
 
 class CovariateCorrelation(Enum):
@@ -52,19 +53,34 @@ class DGPConfig:
     # Hidden confounders
     num_A: int = 1
     confounder_correlation: ConfounderCorrelation = ConfounderCorrelation.INDEPENDENT
+    # ρ used when confounder_correlation=CORRELATED; Var(A) is preserved regardless of value
+    confounder_X_correlation: float = 0.7
 
     # Treatment
     treatment_type: TreatmentType = TreatmentType.BINARY
     treatment_model: TreatmentModel = TreatmentModel.LINEAR
-    beta_dx: Union[float, tuple] = 0.5   # scalar → uniform; tuple → per-column
-    beta_da: Union[float, tuple] = 0.8
+    # Use float or tuple (not np.ndarray) to preserve hashability of frozen dataclass
+    beta_dx: Union[float, tuple, np.ndarray] = 0.5
+    beta_da: Union[float, tuple, np.ndarray] = 0.8
 
     # Outcome
     outcome_type: OutcomeType = OutcomeType.PARTIALLY_LINEAR
-    beta_yx: Union[float, tuple] = 0.5
-    beta_ya: Union[float, tuple] = 0.8
+    beta_yx: Union[float, tuple, np.ndarray] = 0.5
+    beta_ya: Union[float, tuple, np.ndarray] = 0.8
 
     seed: int = 42
+
+    @classmethod
+    def variance_locked(cls, *, num_A: int, total_signal: float = 0.5, **kwargs) -> "DGPConfig":
+        """
+        Convenience constructor: normalise beta_da/ya so num_A confounders together
+        contribute total_signal² variance — identical to the single-confounder baseline.
+
+        Avoids the footgun of setting num_A > 1 without scaling: with k confounders each
+        at strength s, total hidden variance is k·s² rather than s².
+        """
+        beta_per = total_signal / np.sqrt(num_A)
+        return cls(num_A=num_A, beta_da=beta_per, beta_ya=beta_per, **kwargs)
 
 
 # --- Helpers ---
@@ -108,9 +124,15 @@ def generate_data(config: DGPConfig):
     if config.confounder_correlation == ConfounderCorrelation.INDEPENDENT:
         A = rng.standard_normal((config.n, config.num_A))
     else:
-        reps = -(-config.num_A // config.num_X)  # ceiling division
-        X_tiled = np.tile(X, (1, reps))
-        A = 0.7 * X_tiled[:, :config.num_A] + 0.3 * rng.standard_normal((config.n, config.num_A))
+        if config.num_A > config.num_X:
+            raise ValueError(
+                f"CORRELATED confounder requires num_A ({config.num_A}) <= num_X ({config.num_X}). "
+                "Use INDEPENDENT or reduce num_A."
+            )
+        rho_ax = config.confounder_X_correlation
+        noise  = rng.standard_normal((config.n, config.num_A))
+        # Variance-preserving mixture: Var(A_j) = ρ²·Var(X_j) + (1-ρ²)·Var(noise) = 1
+        A = rho_ax * X[:, :config.num_A] + np.sqrt(1.0 - rho_ax ** 2) * noise
 
     beta_dx = _to_vec(config.beta_dx, config.num_X)
     beta_da = _to_vec(config.beta_da, config.num_A)
